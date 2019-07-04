@@ -24,9 +24,9 @@ namespace TimeToFish
 
             foreach ((Type jobType, string jobName) in jobs)
             {
-                if (!jobType.IsSubclassOf(typeof(TimerJob)))
+                if (!typeof(ITimerJob).IsAssignableFrom(jobType))
                     throw new Exception("jobs must inherit from TimerJob");
-                var job = (TimerJob)provider.GetRequiredService(jobType);
+                var job = (ITimerJob)provider.GetRequiredService(jobType);
                 cfg.AddJob(SubscriptionName(jobName), job.Handler);
             }
             return cfg;
