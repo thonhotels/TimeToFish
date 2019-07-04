@@ -1,6 +1,5 @@
 #r "paket:
     nuget Fake.Core.Target
-    nuget Fake.Core.Globbing
     nuget Fake.Core.Trace
     nuget Fake.DotNet.Cli
     nuget Fake.Tools.Git //"
@@ -12,26 +11,30 @@ open Fake.Core
 open Fake.IO
 open Fake.Core.TargetOperators
 open Fake.DotNet
-open Fake.Core.Globbing.Operators
 
 
 let project = "../src"
 
 let artifacts = __SOURCE_DIRECTORY__ + "/artifacts"
 
+// Lazily install DotNet SDK in the correct version if not available
+let dotnetCliPath = lazy DotNet.install DotNet.Versions.FromGlobalJson
+
+let inline dotnetOptions arg = DotNet.Options.lift dotnetCliPath.Value arg
+
 Target.create "Clean" (fun _ ->
-        DotNet.exec id "clean" |> ignore
+        DotNet.exec dotnetOptions "clean" |> ignore
         Shell.cleanDirs [artifacts;]
     )
 
 Target.create "Restore-packages" (fun _ ->       
         [project;]
-        |> Seq.iter (DotNet.restore id)    
+        |> Seq.iter (DotNet.restore dotnetOptions)    
     )
   
 Target.create "Build" (fun _ ->
         [project;]
-        |> Seq.iter (DotNet.build id)    
+        |> Seq.iter (DotNet.build dotnetOptions)    
     )   
 
 Target.create "Pack" (fun _ -> 
