@@ -60,7 +60,19 @@ namespace TimeToFish
 
         internal async Task ProcessMessage(string label, string body, Func<Task> markCompleted, Func<string, Task> abort)
         {
+            bool MessageExpired(TimeEvent m)
+            {
+                var age = DateTime.Now.Subtract(DateTime.Parse(m.Time));
+                return age > TimeSpan.FromMinutes(3.0);
+            }
+
             var message = (TimeEvent)JsonConvert.DeserializeObject(body, typeof(TimeEvent));
+            if (MessageExpired(message))
+            {
+                Log.Warning($"Ignoring expired message. Time: {message.Time}");
+                await markCompleted();
+                return;
+            }
         
             using (var scope = ScopeFactory.CreateScope())
             {
