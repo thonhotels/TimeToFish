@@ -7,7 +7,7 @@ using Serilog;
 
 namespace TimeToFish
 {
-        public class TimeMessagingService : IHostedService
+    public class TimeMessagingService : IHostedService
     {
         private TimeMessagingConfiguration Configuration { get; }
 
