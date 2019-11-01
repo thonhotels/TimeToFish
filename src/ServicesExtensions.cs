@@ -26,8 +26,7 @@ namespace TimeToFish
             {
                 if (!typeof(ITimerJob).IsAssignableFrom(jobType))
                     throw new Exception("jobs must inherit from TimerJob");
-                var job = (ITimerJob)provider.GetRequiredService(jobType);
-                cfg.AddJob(SubscriptionName(jobName), job.Handler);
+                cfg.AddJob(SubscriptionName(jobName), jobType);
             }
             return cfg;
         }

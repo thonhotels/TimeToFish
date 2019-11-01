@@ -24,8 +24,8 @@ namespace TimeToFish
         private IReceiverClient CreateClient(string subscriptionName) =>
             new SubscriptionClient(new ServiceBusConnectionStringBuilder(ConnectionString), subscriptionName); 
         
-        public void AddJob(string subscriptionName, Func<TimeEvent, Task<HandlerResult>> job) =>
-            Dispatchers.Add(new TimeMessageDispatcher(ScopeFactory, CreateClient(subscriptionName), job));
+        public void AddJob(string subscriptionName, Type jobType) =>
+            Dispatchers.Add(new TimeMessageDispatcher(ScopeFactory, CreateClient(subscriptionName), jobType));
 
         public void RegisterMessageHandlers(Func<ExceptionReceivedEventArgs, Task> exceptionReceivedHandler)
         {

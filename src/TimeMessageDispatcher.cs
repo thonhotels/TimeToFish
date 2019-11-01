@@ -21,13 +21,13 @@ namespace TimeToFish
     {
         private IReceiverClient Client { get; }
         private IServiceScopeFactory ScopeFactory { get; }
-        private Func<TimeEvent, Task<HandlerResult>> Handler { get; }
+        private Type JobType { get; }
 
-        internal TimeMessageDispatcher(IServiceScopeFactory scopeFactory, IReceiverClient client, Func<TimeEvent,Task<HandlerResult>> handler)
+        internal TimeMessageDispatcher(IServiceScopeFactory scopeFactory, IReceiverClient client, Type jobType)
         {
             ScopeFactory = scopeFactory;
             Client = client;
-            Handler = handler;
+            JobType = jobType;
         }
 
         public async Task ProcessMessage(Microsoft.Azure.ServiceBus.Message message, CancellationToken token)
@@ -76,7 +76,8 @@ namespace TimeToFish
         
             using (var scope = ScopeFactory.CreateScope())
             {
-                var r = await Handler(message);
+                var job = (ITimerJob)scope.ServiceProvider.GetRequiredService(JobType);
+                var r = await job.Handler(message);
                 if (HandlerResult.IsAbort(r))
                     await abort(r.Message);
                 if (HandlerResult.IsSuccess(r))
