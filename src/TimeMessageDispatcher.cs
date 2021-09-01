@@ -1,9 +1,6 @@
 using System;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Azure.ServiceBus;
-using Microsoft.Azure.ServiceBus.Core;
+using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
 using Serilog;
@@ -14,51 +11,54 @@ namespace TimeToFish
     public interface IMessageDispatcher
     {
         Task Close();
-        void RegisterMessageHandler(Func<ExceptionReceivedEventArgs, Task> exceptionReceivedHandler);
+        Task RegisterMessageHandler(Func<ProcessErrorEventArgs, Task> exceptionReceivedHandler);
     }
 
     public class TimeMessageDispatcher : IMessageDispatcher
     {
-        private IReceiverClient Client { get; }
         private IServiceScopeFactory ScopeFactory { get; }
         private Type JobType { get; }
+        private ServiceBusProcessor Processor { get; }
+        private ServiceBusClient Client { get; }
 
-        internal TimeMessageDispatcher(IServiceScopeFactory scopeFactory, IReceiverClient client, Type jobType)
+        internal TimeMessageDispatcher(IServiceScopeFactory scopeFactory, (ServiceBusClient, ServiceBusProcessor) c_p, Type jobType)
         {
             ScopeFactory = scopeFactory;
-            Client = client;
+            Client = c_p.Item1;
+            Processor = c_p.Item2;
             JobType = jobType;
         }
 
-        public async Task ProcessMessage(Microsoft.Azure.ServiceBus.Message message, CancellationToken token)
+        private async Task ProcessMessage(ProcessMessageEventArgs args)
         {
             using (LogContext.PushProperty("CorrelationId", Guid.NewGuid()))
             {
-                var body = Encoding.UTF8.GetString(message.Body);
-                Log.Debug($"Received time message: SequenceNumber:{message.SystemProperties.SequenceNumber} Body:{body}");
+                var body = args.Message.Body.ToString();
+                var message = args.Message;
+                Log.Debug($"Received time message: SequenceNumber:{message.SequenceNumber} Body:{body}");
                 try
                 {
-                    if (!string.IsNullOrWhiteSpace(message.Label))
+                    if (!string.IsNullOrWhiteSpace(message.Subject))
                     {
-                        await ProcessMessage(message.Label, body,
-                            () => Client.CompleteAsync(message.SystemProperties.LockToken),
-                            m => AddToDeadLetter(message.SystemProperties.LockToken, m));
+                        await ProcessMessage(message.Subject, body,
+                            () => args.CompleteMessageAsync(args.Message),
+                            m => AddToDeadLetter(args, m));
                     }
                     else
                     {
                         Log.Error("Message label is not set. \n Message: {@messageBody} \n Forwarding to DLX", body);
-                        await AddToDeadLetter(message.SystemProperties.LockToken, "Message label is not set.");
+                        await AddToDeadLetter(args, "Message label is not set.");
                     }
                 }
                 catch (JsonException jsonException)
                 {
                     Log.Error(jsonException, "Unable to deserialize message. \n Message: {@messageBody} \n Forwarding to DLX", body);
-                    await AddToDeadLetter(message.SystemProperties.LockToken, jsonException.Message);
+                    await AddToDeadLetter(args, jsonException.Message);
                 }
             }
         }
 
-        internal async Task ProcessMessage(string label, string body, Func<Task> markCompleted, Func<string, Task> abort)
+        internal async Task ProcessMessage(string subject, string body, Func<Task> markCompleted, Func<string, Task> abort)
         {
             bool MessageExpired(TimeEvent m)
             {
@@ -73,34 +73,31 @@ namespace TimeToFish
                 await markCompleted();
                 return;
             }
-        
-            using (var scope = ScopeFactory.CreateScope())
-            {
-                var job = (ITimerJob)scope.ServiceProvider.GetRequiredService(JobType);
-                var r = await job.Handler(message);
-                if (HandlerResult.IsAbort(r))
-                    await abort(r.Message);
-                if (HandlerResult.IsSuccess(r))
-                    await markCompleted();                    
-            }
+
+            using var scope = ScopeFactory.CreateScope();
+            var job = (ITimerJob)scope.ServiceProvider.GetRequiredService(JobType);
+            var r = await job.Handler(message);
+            if (HandlerResult.IsAbort(r))
+                await abort(r.Message);
+            if (HandlerResult.IsSuccess(r))
+                await markCompleted();
         }
 
         public async Task Close()
         {
-            await Client.CloseAsync();
+            await Processor.StopProcessingAsync();
+            await Processor.CloseAsync();
+            await Client.DisposeAsync();
         }
 
-        public void RegisterMessageHandler(Func<ExceptionReceivedEventArgs, Task> exceptionReceivedHandler)
+        public Task RegisterMessageHandler(Func<ProcessErrorEventArgs, Task> exceptionReceivedHandler)
         {
-            Client.RegisterMessageHandler(ProcessMessage, new MessageHandlerOptions(exceptionReceivedHandler)
-            {
-                AutoComplete = false,
-            });
+            Processor.ProcessMessageAsync += ProcessMessage;
+            Processor.ProcessErrorAsync += exceptionReceivedHandler;
+            return Processor.StartProcessingAsync();
         }
 
-        private async Task AddToDeadLetter(string lockToken, string errorMessage)
-        {
-            await Client.DeadLetterAsync(lockToken, "Invalid message", errorMessage);
-        }
+        private Task AddToDeadLetter(ProcessMessageEventArgs args, string errorMessage) =>
+            args.DeadLetterMessageAsync(args.Message, "Invalid message", errorMessage);
     }
 }

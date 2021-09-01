@@ -1,7 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Azure.ServiceBus;
+using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 
@@ -9,35 +9,32 @@ namespace TimeToFish
 {
     public class TimeMessagingService : IHostedService
     {
-        private TimeMessagingConfiguration Configuration { get; }
+        private ITimeMessagingConfiguration Configuration { get; }
 
-        public TimeMessagingService(TimeMessagingConfiguration configuration)
+        public TimeMessagingService(ITimeMessagingConfiguration configuration)
         {
             Configuration = configuration;
         }
 
-        public Task StartAsync(CancellationToken cancellationToken)
+        public async Task StartAsync(CancellationToken cancellationToken)
         {
             try
             {
-                Configuration.RegisterMessageHandlers(ExceptionReceivedHandler);
-                return Task.CompletedTask;
+                await Configuration.RegisterMessageHandlers(ExceptionReceivedHandler);
             }
             catch (Exception exception)
             {
                 Log.Error($"Error registering message handler", exception);
-                return Task.CompletedTask;
             }
         }
 
-        Task ExceptionReceivedHandler(ExceptionReceivedEventArgs exceptionReceivedEventArgs)
+        Task ExceptionReceivedHandler(ProcessErrorEventArgs args)
         {
-            var context = exceptionReceivedEventArgs.ExceptionReceivedContext;
-            Log.Error(exceptionReceivedEventArgs.Exception,
-                        $@"Message handler encountered an exception.
-                        Endpoint: {context.Endpoint}
-                        Entity Path: {context.EntityPath}
-                        Executing Action: {context.Action}");
+            Log.Error(args.Exception,
+                $@"Message handler encountered an exception.
+                        ErrorSource: {Enum.GetName(typeof(ServiceBusErrorSource), args.ErrorSource)}
+                        Entity Path: {args.EntityPath}
+                        Namespace: {args.FullyQualifiedNamespace}");
 
             return Task.CompletedTask;
         }
