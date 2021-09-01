@@ -61,6 +61,22 @@ await new HostBuilder()
                 .RunConsoleAsync();
 </code></pre>
 
+or
+
+<pre><code>
+await new HostBuilder()
+                .ConfigureServices((hostContext, services) =>
+                {
+                    services.ConfigureTimerJobs(new DefaultAzureCredential(),
+                                    "{yournamespace}.servicebus.windows.net",
+                                    "time.events",
+                                    "myservice", 
+                                    MyFirstJob.JobDefinition,
+                                    MySecondJob.JobDefinition);
+                })                    
+                .RunConsoleAsync();
+</code></pre>
+
 This will register the two types MyFirstJob and MySecondJob in the IoC container, wire up the two jobs with the 
 azure servicebus and register a HostedService that will contain the messaghandlers.
 The code will assume that there are two subscriptions named "myservice.my-first-job" and "myservice.my-second-job" 
