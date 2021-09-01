@@ -2,12 +2,17 @@
 Library for simple handling of time events to implement crontab like functionality using azure service bus events.
 Inspired by [Passage of time event pattern](http://verraes.net/2019/05/patterns-for-decoupling-distsys-passage-of-time-event/)
 
-The library consist of a single extension method on the IServiceCollection interface. </br>
+The library consist of two extension methods on the IServiceCollection interface. </br>
 `IServiceCollection ConfigureTimerJobs(this IServiceCollection services, string connectionString, string serviceName, params (Type jobType, string subscriptionName)[] jobs)`
 
-- `connectionString`: the connection string to the Azure Service Bus topic where the TimeHasPassed events are published
+`IServiceCollection ConfigureTimerJobs(this IServiceCollection services, TokenCredential tokenCredential, string fullyQualifiedNamespace, string entityName, string serviceName, params (Type jobType, string subscriptionName)[] jobs)`
+- `connectionString`: The connection string to the Azure Service Bus topic where the TimeHasPassed events are published
 - `serviceName`: Unique name of the service 
-- `jobs`: array of tuples containing `jobType` and `subscriptionName`. `jobType` is the type of the class implementing the event handler/the job. `subscriptionName` is the name of a subscription on the Topic. The topic should be configured to filter on the right Time events. [Bluefin](https://www.nuget.org/packages/Bluefin/) has a function `Jobs.createJobSubscriptions` which can be used to create subscriptions.
+- `jobs`: Array of tuples containing `jobType` and `subscriptionName`. `jobType` is the type of the class implementing the event handler/the job. `subscriptionName` is the name of a subscription on the Topic. The topic should be configured to filter on the right Time events. [Bluefin](https://www.nuget.org/packages/Bluefin/) has a function `Jobs.createJobSubscriptions` which can be used to create subscriptions.
+- `tokenCredential`: Azure Active Directory token authentication support.
+- `fullyQualifiedNamespace`: The fully qualified Service Bus namespace that the connection is associated with. This is likely to be similar to `{yournamespace}.servicebus.windows.net`.
+- `entityName`: The name of the specific Service Bus entity instance under the associated Service Bus namespace.
+
 Source code for Bluefin `Jobs.createJobSubscriptions` can be found [here](https://github.com/thonhotels/bluefin/blob/master/src/Jobs.fs)
 
 A JobHandler must implement the interface `TimeToFish.ITimerJob`</br> 
