@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net6.0;net7.0</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;net7</TargetFrameworks>
     <Description>Handling of time events to create cron like functionality</Description>
     <AssemblyName>Thon.Hotels.TimeToFish</AssemblyName>
     <Authors>Novanet</Authors>
