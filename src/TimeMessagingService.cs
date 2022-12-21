@@ -5,45 +5,44 @@ using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 
-namespace TimeToFish
+namespace TimeToFish;
+
+public class TimeMessagingService : IHostedService
 {
-    public class TimeMessagingService : IHostedService
+    private ITimeMessagingConfiguration Configuration { get; }
+
+    public TimeMessagingService(ITimeMessagingConfiguration configuration)
     {
-        private ITimeMessagingConfiguration Configuration { get; }
+        Configuration = configuration;
+    }
 
-        public TimeMessagingService(ITimeMessagingConfiguration configuration)
+    public async Task StartAsync(CancellationToken cancellationToken)
+    {
+        try
         {
-            Configuration = configuration;
+            await Configuration.RegisterMessageHandlers(ExceptionReceivedHandler);
         }
-
-        public async Task StartAsync(CancellationToken cancellationToken)
+        catch (Exception exception)
         {
-            try
-            {
-                await Configuration.RegisterMessageHandlers(ExceptionReceivedHandler);
-            }
-            catch (Exception exception)
-            {
-                Log.Error($"Error registering message handler", exception);
-            }
+            Log.Error($"Error registering message handler", exception);
         }
+    }
 
-        Task ExceptionReceivedHandler(ProcessErrorEventArgs args)
-        {
-            Log.Error(args.Exception,
-                $@"Message handler encountered an exception.
+    Task ExceptionReceivedHandler(ProcessErrorEventArgs args)
+    {
+        Log.Error(args.Exception,
+            $@"Message handler encountered an exception.
                         ErrorSource: {Enum.GetName(typeof(ServiceBusErrorSource), args.ErrorSource)}
                         Entity Path: {args.EntityPath}
                         Namespace: {args.FullyQualifiedNamespace}");
 
-            return Task.CompletedTask;
-        }
+        return Task.CompletedTask;
+    }
 
-        public async Task StopAsync(CancellationToken cancellationToken)
-        {
-            Log.Information("Signal received. Gracefully shutting down.");
-            await Configuration.Close();
-            Thread.Sleep(1000);
-        }
+    public async Task StopAsync(CancellationToken cancellationToken)
+    {
+        Log.Information("Signal received. Gracefully shutting down.");
+        await Configuration.Close();
+        Thread.Sleep(1000);
     }
 }
