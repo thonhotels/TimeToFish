@@ -1,9 +1,8 @@
 using System.Threading.Tasks;
 
-namespace TimeToFish
+namespace TimeToFish;
+
+public interface ITimerJob
 {
-    public interface ITimerJob
-    {
-        Task<HandlerResult> Handler(TimeEvent message);
-    }
+    Task<HandlerResult> Handler(TimeEvent message);
 }
