@@ -10,6 +10,7 @@
     <RootNamespace>TimeToFish</RootNamespace>
     <PackageId>TimeToFish</PackageId>
     <Version>1.1.0</Version>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>
